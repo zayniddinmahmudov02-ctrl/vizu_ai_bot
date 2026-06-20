@@ -1,16 +1,24 @@
-import aiosqlite
+import asyncpg
+from config import DATABASE_URL
 
-DB = "tasks.db"
+pool = None
 
 # ==========================
 # INITIALIZATION
 # ==========================
 async def init_db():
-    async with aiosqlite.connect(DB) as db:
 
-        await db.execute("""
+    global pool
+
+    pool = await asyncpg.create_pool(
+        DATABASE_URL
+    )
+
+    async with pool.acquire() as conn:
+
+        await conn.execute("""
         CREATE TABLE IF NOT EXISTS users(
-            user_id INTEGER PRIMARY KEY,
+            user_id BIGINT PRIMARY KEY,
             full_name TEXT,
             total_score INTEGER DEFAULT 0,
             accepted_tasks INTEGER DEFAULT 0,
@@ -18,22 +26,19 @@ async def init_db():
         )
         """)
 
-        await db.execute("""
+        await conn.execute("""
         CREATE TABLE IF NOT EXISTS submissions(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
             full_name TEXT,
             lesson_number INTEGER,
             file_id TEXT,
             file_type TEXT,
             score INTEGER DEFAULT 0,
             status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT NOW()
         )
         """)
-
-        await db.commit()
-
 
 # ==========================
 # USERS
@@ -42,69 +47,65 @@ async def add_user(
     user_id: int,
     full_name: str
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        await db.execute(
+    async with pool.acquire() as conn:
+
+        await conn.execute(
             """
-            INSERT OR IGNORE INTO users(
+            INSERT INTO users(
                 user_id,
                 full_name
             )
-            VALUES (?,?)
+            VALUES($1,$2)
+            ON CONFLICT(user_id)
+            DO NOTHING
             """,
-            (
-                user_id,
-                full_name
-            )
+            user_id,
+            full_name
         )
-
-        await db.commit()
 
 
 async def get_user(
     user_id: int
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        cur = await db.execute(
+    async with pool.acquire() as conn:
+
+        return await conn.fetchrow(
             """
             SELECT *
             FROM users
-            WHERE user_id=?
+            WHERE user_id=$1
             """,
-            (user_id,)
+            user_id
         )
-
-        return await cur.fetchone()
 
 
 async def update_name(
     user_id: int,
     new_name: str
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        await db.execute(
+    async with pool.acquire() as conn:
+
+        await conn.execute(
             """
             UPDATE users
-            SET full_name=?
-            WHERE user_id=?
+            SET full_name=$1
+            WHERE user_id=$2
             """,
-            (
-                new_name,
-                user_id
-            )
+            new_name,
+            user_id
         )
-
-        await db.commit()
 
 
 async def get_top_users(
     limit=20
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        cur = await db.execute(
+    async with pool.acquire() as conn:
+
+        return await conn.fetch(
             """
             SELECT
                 full_name,
@@ -113,13 +114,10 @@ async def get_top_users(
             ORDER BY
                 total_score DESC,
                 accepted_tasks DESC
-            LIMIT ?
+            LIMIT $1
             """,
-            (limit,)
+            limit
         )
-
-        return await cur.fetchall()
-
 
 # ==========================
 # SUBMISSIONS
@@ -131,9 +129,10 @@ async def add_submission(
     file_id,
     file_type
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        cur = await db.execute(
+    async with pool.acquire() as conn:
+
+        row = await conn.fetchrow(
             """
             INSERT INTO submissions(
                 user_id,
@@ -142,37 +141,33 @@ async def add_submission(
                 file_id,
                 file_type
             )
-            VALUES(?,?,?,?,?)
+            VALUES($1,$2,$3,$4,$5)
+            RETURNING id
             """,
-            (
-                user_id,
-                full_name,
-                lesson_number,
-                file_id,
-                file_type
-            )
+            user_id,
+            full_name,
+            lesson_number,
+            file_id,
+            file_type
         )
 
-        await db.commit()
-
-        return cur.lastrowid
+        return row["id"]
 
 
 async def get_submission(
     submission_id
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        cur = await db.execute(
+    async with pool.acquire() as conn:
+
+        return await conn.fetchrow(
             """
             SELECT *
             FROM submissions
-            WHERE id=?
+            WHERE id=$1
             """,
-            (submission_id,)
+            submission_id
         )
-
-        return await cur.fetchone()
 
 
 async def update_score(
@@ -180,75 +175,65 @@ async def update_score(
     score,
     status
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        cur = await db.execute(
+    async with pool.acquire() as conn:
+
+        submission = await conn.fetchrow(
             """
             SELECT *
             FROM submissions
-            WHERE id=?
+            WHERE id=$1
             """,
-            (submission_id,)
+            submission_id
         )
-
-        submission = await cur.fetchone()
 
         if not submission:
             return False
 
-        if submission[7] != "pending":
+        if submission["status"] != "pending":
             return False
 
-        user_id = submission[1]
+        user_id = submission["user_id"]
 
-        await db.execute(
+        await conn.execute(
             """
             UPDATE submissions
-            SET score=?,
-                status=?
-            WHERE id=?
+            SET score=$1,
+                status=$2
+            WHERE id=$3
             """,
-            (
-                score,
-                status,
-                submission_id
-            )
+            score,
+            status,
+            submission_id
         )
 
         if score >= 4:
 
-            await db.execute(
+            await conn.execute(
                 """
                 UPDATE users
                 SET
-                    total_score = total_score + ?,
+                    total_score = total_score + $1,
                     accepted_tasks = accepted_tasks + 1
-                WHERE user_id=?
+                WHERE user_id=$2
                 """,
-                (
-                    score,
-                    user_id
-                )
+                score,
+                user_id
             )
 
         else:
 
-            await db.execute(
+            await conn.execute(
                 """
                 UPDATE users
                 SET
                     rejected_tasks = rejected_tasks + 1
-                WHERE user_id=?
+                WHERE user_id=$1
                 """,
-                (
-                    user_id,
-                )
+                user_id
             )
 
-        await db.commit()
-
         return True
-
 
 # ==========================
 # RANKING
@@ -256,9 +241,10 @@ async def update_score(
 async def get_user_rank(
     user_id
 ):
-    async with aiosqlite.connect(DB) as db:
 
-        cur = await db.execute(
+    async with pool.acquire() as conn:
+
+        rows = await conn.fetch(
             """
             SELECT user_id
             FROM users
@@ -268,48 +254,37 @@ async def get_user_rank(
             """
         )
 
-        rows = await cur.fetchall()
-
         for i, row in enumerate(
             rows,
             start=1
         ):
-            if row[0] == user_id:
+            if row["user_id"] == user_id:
                 return i
 
         return "-"
-
 
 # ==========================
 # ADMIN STATS
 # ==========================
 async def get_users_count():
 
-    async with aiosqlite.connect(DB) as db:
+    async with pool.acquire() as conn:
 
-        cur = await db.execute(
+        return await conn.fetchval(
             """
             SELECT COUNT(*)
             FROM users
             """
         )
 
-        row = await cur.fetchone()
-
-        return row[0]
-
 
 async def get_tasks_count():
 
-    async with aiosqlite.connect(DB) as db:
+    async with pool.acquire() as conn:
 
-        cur = await db.execute(
+        return await conn.fetchval(
             """
             SELECT COUNT(*)
             FROM submissions
             """
         )
-
-        row = await cur.fetchone()
-
-        return row[0]

@@ -16,3 +16,6 @@ ADMIN_IDS = [
     ).split(",")
     if x.strip()
 ]
+DATABASE_URL = os.getenv(
+    "DATABASE_URL"
+)
