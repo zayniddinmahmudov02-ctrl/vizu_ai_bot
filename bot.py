@@ -369,7 +369,7 @@ async def receive_task(
         )
 
     await message.answer(
-        "✅ Vazifa yuborildi.\n\nAdmin tekshiradi.",
+        "✅ Vazifa yuborildi.\n\nLehrer tekshiradi.",
         reply_markup=main_menu
     )
 
