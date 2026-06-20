@@ -24,6 +24,7 @@ app = Flask(__name__)
 def home():
     return "VIZU AI BOT ishlayapti!"
 from aiogram.exceptions import TelegramBadRequest
+from keep_alive import keep_alive
 # =========================
 # MENYU
 # =========================
