@@ -1,8 +1,13 @@
-BOT_TOKEN = "8740619987:AAG89UTmoCYmYG3wFaX0OpU_gECsO9m18jI"
+import os
 
-CHANNEL_USERNAME = "@vizu_deutsch"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
+
+CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+
 ADMIN_IDS = [
-    7790766887
+    int(x.strip())
+    for x in os.getenv("ADMIN_IDS", "").split(",")
+    if x.strip()
 ]
-
-CHANNEL_ID = -1004378744034
