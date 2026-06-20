@@ -23,6 +23,7 @@ app = Flask(__name__)
 @app.route("/")
 def home():
     return "VIZU AI BOT ishlayapti!"
+from aiogram.exceptions import TelegramBadRequest
 # =========================
 # MENYU
 # =========================
@@ -46,7 +47,64 @@ main_menu = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+admin_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="📊 Admin Panel")
+        ],
+        [
+            KeyboardButton(text="🏆 O'quvchilar reytingi")
+        ],
+        [
+            KeyboardButton(text="👤 Mening profilim")
+        ]
+    ],
+    resize_keyboard=True
+)
+# =========================
+# ADMIN PANEL
+# =========================
 
+@dp.message(
+    F.text == "📊 Admin Panel"
+)
+async def admin_panel(
+    message: Message
+):
+
+    if message.from_user.id != MAIN_ADMIN_ID:
+        return
+
+    users = await get_users_count()
+    tasks = await get_tasks_count()
+
+    text = (
+        "📊 Admin Panel\n\n"
+        f"👥 Foydalanuvchilar: {users}\n"
+        f"📚 Vazifalar: {tasks}"
+    )
+
+    await message.answer(text)
+
+async def check_subscription(
+    user_id: int
+):
+
+    try:
+
+        member = await bot.get_chat_member(
+            CHANNEL_USERNAME,
+            user_id
+        )
+
+        return member.status in [
+            "member",
+            "administrator",
+            "creator"
+        ]
+
+    except TelegramBadRequest:
+        return False
 # =========================
 # FSM STATES
 # =========================
@@ -63,14 +121,61 @@ class ProfileState(StatesGroup):
 # START
 # =========================
 @dp.message(CommandStart())
-async def start(message: Message, state: FSMContext):
-    user = await get_user(message.from_user.id)
+async def start(
+    message: Message,
+    state: FSMContext
+):
+
+    subscribed = await check_subscription(
+        message.from_user.id
+    )
+
+    if not subscribed:
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="📢 Kanalga kirish",
+                        url=f"https://t.me/{CHANNEL_USERNAME.replace('@','')}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="✅ Tekshirish",
+                        callback_data="check_sub"
+                    )
+                ]
+            ]
+        )
+
+        await message.answer(
+            "📢 Botdan foydalanish uchun kanalga obuna bo'ling.",
+            reply_markup=kb
+        )
+
+        return
+
+    user = await get_user(
+        message.from_user.id
+    )
 
     if user:
-        await message.answer(
-            f"Xush kelibsiz, {user[1]}!",
-            reply_markup=main_menu
-        )
+
+        if message.from_user.id == MAIN_ADMIN_ID:
+
+            await message.answer(
+                f"👑 Xush kelibsiz, {user[1]}!",
+                reply_markup=admin_menu
+            )
+
+        else:
+
+            await message.answer(
+                f"Xush kelibsiz, {user[1]}!",
+                reply_markup=main_menu
+            )
+
         return
 
     await message.answer(
@@ -80,8 +185,9 @@ async def start(message: Message, state: FSMContext):
         "Zayniddinkhuja Makhmudov"
     )
 
-    await state.set_state(RegisterState.full_name)
-
+    await state.set_state(
+        RegisterState.full_name
+    )
 # =========================
 # REGISTER
 # =========================
@@ -440,7 +546,6 @@ async def leaderboard(
         )
 
     await message.answer(text)
-
 # =========================
 # BACK
 # =========================
@@ -450,17 +555,23 @@ async def leaderboard(
 async def back_menu(
     message: Message
 ):
-    await message.answer(
-        "Asosiy menyu",
-        reply_markup=main_menu
-    )
+
+    if message.from_user.id == MAIN_ADMIN_ID:
+
+        await message.answer(
+            "Asosiy menyu",
+            reply_markup=admin_menu
+        )
+
+    else:
+
+        await message.answer(
+            "Asosiy menyu",
+            reply_markup=main_menu
+        )
 # =========================
 # FLASK WEB SERVER
 # =========================
-from flask import Flask
-from threading import Thread
-import os
-
 app = Flask(__name__)
 
 @app.route("/")
