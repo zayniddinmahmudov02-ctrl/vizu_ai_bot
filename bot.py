@@ -13,10 +13,16 @@ from aiogram.types import (
 )
 from config import *
 from database import *
-
+from flask import Flask
+from threading import Thread
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "VIZU AI BOT ishlayapti!"
 # =========================
 # MENYU
 # =========================
@@ -448,12 +454,43 @@ async def back_menu(
         "Asosiy menyu",
         reply_markup=main_menu
     )
+# =========================
+# FLASK WEB SERVER
+# =========================
+from flask import Flask
+from threading import Thread
+import os
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "VIZU AI BOT ishlayapti!"
+
+def run_web():
+    port = int(
+        os.environ.get(
+            "PORT",
+            10000
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
 
 # =========================
 # MAIN
 # =========================
 async def main():
+
     await init_db()
+
+    Thread(
+        target=run_web,
+        daemon=True
+    ).start()
 
     print("Bot ishga tushdi...")
 
