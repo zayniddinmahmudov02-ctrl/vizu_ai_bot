@@ -23,4 +23,4 @@ DATABASE_URL = os.getenv(
 # BOT NAME
 # =========================
 
-BOT_NAME = "vizu_homework"
+BOT_NAME = "vizu_ai_bot"
