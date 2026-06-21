@@ -45,7 +45,7 @@ async def init_db():
         # OLD DATABASE FIXES
         await conn.execute("""
             ALTER TABLE users
-            ADD COLUMN IF NOT EXISTS bot_name TEXT
+            ADD COLUMN IF NOT EXISTS bot_name TEXT DEFAULT 'vizu_homework'
         """)
 
         await conn.execute("""
