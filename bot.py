@@ -998,7 +998,6 @@ async def back_menu(
             "Asosiy menyu",
             reply_markup=main_menu
         )
-
 # =========================
 # MAIN
 # =========================
@@ -1010,9 +1009,27 @@ async def main():
         drop_pending_updates=True
     )
 
+    me = await bot.get_me()
+
+    print(
+        f"STARTED BOT: @{me.username}"
+    )
+
+    print(
+        f"BOT ID: {me.id}"
+    )
+
+    Thread(
+        target=run_web,
+        daemon=True
+    ).start()
+
     print("Bot ishga tushdi...")
 
-    await dp.start_polling(bot)
+    await dp.start_polling(
+        bot,
+        allowed_updates=dp.resolve_used_update_types()
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
