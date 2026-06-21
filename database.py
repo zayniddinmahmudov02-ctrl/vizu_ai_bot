@@ -144,21 +144,17 @@ async def lesson_already_passed(user_id: int, lesson_number: int):
             LIMIT 1
         """, user_id, lesson_number)
         return row is not None
-
 # ==========================
 # GET USER
 # ==========================
 async def get_user(user_id: int):
     async with pool.acquire() as conn:
-        return await conn.fetchrow(
-            """
+        return await conn.fetchrow("""
             SELECT *
             FROM users
             WHERE user_id=$1
-            """,
-            user_id
-        )
-
+            AND bot_name=$2
+        """, user_id, BOT_NAME)
 
 # ==========================
 # UPDATE NAME
@@ -175,42 +171,36 @@ async def update_name(user_id: int, new_name: str):
             user_id
         )
 
-
 # ==========================
 # TOP USERS
 # ==========================
 async def get_top_users(limit=20):
     async with pool.acquire() as conn:
-        return await conn.fetch(
-            """
+        return await conn.fetch("""
             SELECT
                 full_name,
                 total_score
             FROM users
+            WHERE bot_name=$1
             ORDER BY
                 total_score DESC,
                 accepted_tasks DESC
-            LIMIT $1
-            """,
-            limit
-        )
-
-
+            LIMIT $2
+        """, BOT_NAME, limit)
 # ==========================
 # RANKING
 # ==========================
 async def get_user_rank(user_id):
     async with pool.acquire() as conn:
 
-        rows = await conn.fetch(
-            """
+        rows = await conn.fetch("""
             SELECT user_id
             FROM users
+            WHERE bot_name=$1
             ORDER BY
                 total_score DESC,
                 accepted_tasks DESC
-            """
-        )
+        """, BOT_NAME)
 
         for i, row in enumerate(rows, start=1):
             if row["user_id"] == user_id:
@@ -219,17 +209,16 @@ async def get_user_rank(user_id):
         return "-"
 
 
-# ==========================
+# =============# ==========================
 # USERS COUNT
 # ==========================
 async def get_users_count():
     async with pool.acquire() as conn:
-        return await conn.fetchval(
-            """
+        return await conn.fetchval("""
             SELECT COUNT(*)
             FROM users
-            """
-        )
+            WHERE bot_name=$1
+        """, BOT_NAME)
 # ==========================
 # TASKS COUNT
 # ==========================
