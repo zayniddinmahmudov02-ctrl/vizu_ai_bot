@@ -19,3 +19,8 @@ ADMIN_IDS = [
 DATABASE_URL = os.getenv(
     "DATABASE_URL"
 )
+# =========================
+# BOT NAME
+# =========================
+
+BOT_NAME = "vizu_homework"

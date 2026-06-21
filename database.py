@@ -1,8 +1,7 @@
 import asyncpg
 from config import DATABASE_URL
-
+from config import *
 pool = None
-
 # ==========================
 # INITIALIZATION
 # ==========================
@@ -20,6 +19,7 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS users(
             user_id BIGINT PRIMARY KEY,
             full_name TEXT,
+            bot_name TEXT DEFAULT 'vizu_homework',
             total_score INTEGER DEFAULT 0,
             accepted_tasks INTEGER DEFAULT 0,
             rejected_tasks INTEGER DEFAULT 0
@@ -40,6 +40,11 @@ async def init_db():
         )
         """)
 
+        # Eski bazalarda bot_name bo'lmasa qo'shib qo'yadi
+        await conn.execute("""
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS bot_name TEXT
+        """)
 # ==========================
 # USERS
 # ==========================
@@ -54,71 +59,18 @@ async def add_user(
             """
             INSERT INTO users(
                 user_id,
-                full_name
+                full_name,
+                bot_name
             )
-            VALUES($1,$2)
+            VALUES($1,$2,$3)
             ON CONFLICT(user_id)
             DO NOTHING
             """,
             user_id,
-            full_name
+            full_name,
+            BOT_NAME
         )
-
-
-async def get_user(
-    user_id: int
-):
-
-    async with pool.acquire() as conn:
-
-        return await conn.fetchrow(
-            """
-            SELECT *
-            FROM users
-            WHERE user_id=$1
-            """,
-            user_id
-        )
-
-
-async def update_name(
-    user_id: int,
-    new_name: str
-):
-
-    async with pool.acquire() as conn:
-
-        await conn.execute(
-            """
-            UPDATE users
-            SET full_name=$1
-            WHERE user_id=$2
-            """,
-            new_name,
-            user_id
-        )
-
-
-async def get_top_users(
-    limit=20
-):
-
-    async with pool.acquire() as conn:
-
-        return await conn.fetch(
-            """
-            SELECT
-                full_name,
-                total_score
-            FROM users
-            ORDER BY
-                total_score DESC,
-                accepted_tasks DESC
-            LIMIT $1
-            """,
-            limit
-        )
-
+    # ==========================
 # ==========================
 # SUBMISSIONS
 # ==========================
@@ -234,7 +186,95 @@ async def update_score(
             )
 
         return True
+# ==========================
+# LESSON ALREADY PASSED
+# ==========================
 
+async def lesson_already_passed(
+    user_id: int,
+    lesson_number: int
+):
+
+    async with pool.acquire() as conn:
+
+        row = await conn.fetchrow(
+            """
+            SELECT id
+            FROM submissions
+            WHERE user_id=$1
+            AND lesson_number=$2
+            AND status='accepted'
+            LIMIT 1
+            """,
+            user_id,
+            lesson_number
+        )
+
+        return row is not None
+# ==========================
+# GET USER
+# ==========================
+async def get_user(
+    user_id: int
+):
+
+    async with pool.acquire() as conn:
+
+        return await conn.fetchrow(
+            """
+            SELECT *
+            FROM users
+            WHERE user_id=$1
+            AND bot_name=$2
+            """,
+            user_id,
+            BOT_NAME
+        )
+# ==========================
+# UPDATE NAME
+# ==========================
+async def update_name(
+    user_id: int,
+    new_name: str
+):
+
+    async with pool.acquire() as conn:
+
+        await conn.execute(
+            """
+            UPDATE users
+            SET full_name=$1
+            WHERE user_id=$2
+            AND bot_name=$3
+            """,
+            new_name,
+            user_id,
+            BOT_NAME
+        )
+# ==========================
+# TOP USERS
+# ==========================
+async def get_top_users(
+    limit=20
+):
+
+    async with pool.acquire() as conn:
+
+        return await conn.fetch(
+            """
+            SELECT
+                full_name,
+                total_score
+            FROM users
+            WHERE bot_name=$1
+            ORDER BY
+                total_score DESC,
+                accepted_tasks DESC
+            LIMIT $2
+            """,
+            BOT_NAME,
+            limit
+        )
 # ==========================
 # RANKING
 # ==========================
@@ -248,10 +288,12 @@ async def get_user_rank(
             """
             SELECT user_id
             FROM users
+            WHERE bot_name=$1
             ORDER BY
                 total_score DESC,
                 accepted_tasks DESC
-            """
+            """,
+            BOT_NAME
         )
 
         for i, row in enumerate(
@@ -262,9 +304,8 @@ async def get_user_rank(
                 return i
 
         return "-"
-
 # ==========================
-# ADMIN STATS
+# USERS COUNT
 # ==========================
 async def get_users_count():
 
@@ -274,10 +315,13 @@ async def get_users_count():
             """
             SELECT COUNT(*)
             FROM users
-            """
+            WHERE bot_name=$1
+            """,
+            BOT_NAME
         )
-
-
+# ==========================
+# TASKS COUNT
+# ==========================
 async def get_tasks_count():
 
     async with pool.acquire() as conn:

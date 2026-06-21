@@ -1,3 +1,4 @@
+import os
 import asyncio
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
@@ -133,6 +134,34 @@ async def check_subscription(
     except TelegramBadRequest:
         return False
 # =========================
+# CHECK SUB CALLBACK
+# =========================
+@dp.callback_query(
+    F.data == "check_sub"
+)
+async def check_sub_callback(
+    callback: CallbackQuery
+):
+
+    subscribed = await check_subscription(
+        callback.from_user.id
+    )
+
+    if subscribed:
+
+        await callback.message.delete()
+
+        await callback.message.answer(
+            "✅ Obuna tasdiqlandi.\n\n/start yuboring."
+        )
+
+    else:
+
+        await callback.answer(
+            "❌ Hali kanalga a'zo bo'lmagansiz.",
+            show_alert=True
+        )
+# =========================
 # FSM STATES
 # =========================
 class RegisterState(StatesGroup):
@@ -190,13 +219,13 @@ async def start(
     if user:
         if message.from_user.id == MAIN_ADMIN_ID:
             await message.answer(
-                f"👑 Xush kelibsiz, {user[1]}!\n\n"
+                f"👑 Xush kelibsiz, {user['full_name']}!\n\n"
                 "Admin panel uchun /admin yozing.",
                 reply_markup=main_menu
             )
         else:
             await message.answer(
-                f"Xush kelibsiz, {user[1]}!",
+                f"Xush kelibsiz, {user['full_name']}!",
                 reply_markup=main_menu
             )
 
@@ -288,6 +317,20 @@ async def receive_task(
     data = await state.get_data()
 
     lesson_number = data["lesson"]
+
+    passed = await lesson_already_passed(
+        message.from_user.id,
+        lesson_number
+    )
+
+    if passed:
+        await message.answer(
+            f"✅ {lesson_number}-dars avval qabul qilingan.\n\n"
+            "Qayta yuborish mumkin emas."
+        )
+
+        await state.clear()
+        return
 
     if message.document:
         file_id = message.document.file_id
@@ -452,7 +495,6 @@ async def grade_task(
     await callback.answer(
         f"{score} baho qo'yildi"
     )
-
 # =========================
 # PROFILE
 # =========================
@@ -474,10 +516,10 @@ async def my_profile(
     )
 
     text = (
-        f"👤 Ism: {user[1]}\n\n"
-        f"⭐ Jami ball: {user[2]}\n"
-        f"✅ Qabul qilingan: {user[3]}\n"
-        f"❌ Qaytarilgan: {user[4]}\n\n"
+        f"👤 Ism: {user['full_name']}\n\n"
+        f"⭐ Jami ball: {user['total_score']}\n"
+        f"✅ Qabul qilingan: {user['accepted_tasks']}\n"
+        f"❌ Qaytarilgan: {user['rejected_tasks']}\n\n"
         f"🏆 Reyting: #{rank}"
     )
 
@@ -501,7 +543,6 @@ async def my_profile(
         text,
         reply_markup=kb
     )
-
 # =========================
 # RENAME
 # =========================
@@ -565,8 +606,8 @@ async def leaderboard(
 
         text += (
             f"{prefix} "
-            f"{user[0]} — "
-            f"{user[1]} ball\n"
+            f"{user['full_name']} — "
+            f"{user['total_score']} ball\n"
         )
 
     await message.answer(text)
@@ -612,18 +653,12 @@ def run_web():
         host="0.0.0.0",
         port=port
     )
-
 # =========================
 # MAIN
 # =========================
 async def main():
 
     await init_db()
-
-    Thread(
-        target=run_web,
-        daemon=True
-    ).start()
 
     print("Bot ishga tushdi...")
 
