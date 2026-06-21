@@ -259,31 +259,59 @@ async def save_name(message: Message, state: FSMContext):
     )
 
     await state.clear()
-
 # =========================
 # TASK MENU
 # =========================
 @dp.message(F.text == "📤 Vazifa yuborish")
 async def task_menu(message: Message, state: FSMContext):
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text="⬅️ Orqaga"
+                )
+            ]
+        ],
+        resize_keyboard=True
+    )
+
     await message.answer(
         "📚 Qaysi dars vazifasini yubormoqchisiz?\n\n"
         "Masalan:\n"
         "1\n"
         "5\n"
-        "12"
+        "12",
+        reply_markup=kb
     )
 
     await state.set_state(TaskState.lesson)
-
 # =========================
 # LESSON NUMBER
 # =========================
 @dp.message(TaskState.lesson)
-async def get_lesson(message: Message, state: FSMContext):
-    if not message.text.isdigit():
+async def get_lesson(
+    message: Message,
+    state: FSMContext
+):
+
+    if message.text == "⬅️ Orqaga":
+
+        await state.clear()
+
         await message.answer(
-            "Faqat dars raqamini yuboring."
+            "🏠 Asosiy menyu",
+            reply_markup=main_menu
         )
+
+        return
+
+    if not message.text.isdigit():
+
+        await message.answer(
+            "❌ Faqat dars raqamini yuboring.\n\nMasalan: 1, 5, 12"
+        )
+
         return
 
     lesson = int(message.text)
@@ -292,13 +320,61 @@ async def get_lesson(message: Message, state: FSMContext):
         lesson=lesson
     )
 
-    await message.answer(
-        f"📤 {lesson}-dars uchun vazifangizni yuboring.\n\n"
-        "Rasm, audio, video yoki fayl yuborishingiz mumkin."
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text="⬅️ Orqaga"
+                )
+            ]
+        ],
+        resize_keyboard=True
     )
 
-    await state.set_state(TaskState.file)
+    await message.answer(
+        f"📤 {lesson}-dars uchun vazifangizni yuboring.\n\n"
+        "📎 Rasm, audio, video yoki fayl yuborishingiz mumkin.",
+        reply_markup=kb
+    )
 
+    await state.set_state(
+        TaskState.file
+    )
+# =========================
+# BACK FROM FILE
+# =========================
+@dp.message(
+    TaskState.file,
+    F.text == "⬅️ Orqaga"
+)
+async def back_from_file(
+    message: Message,
+    state: FSMContext
+):
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text="⬅️ Orqaga"
+                )
+            ]
+        ],
+        resize_keyboard=True
+    )
+
+    await message.answer(
+        "📚 Qaysi dars vazifasini yubormoqchisiz?\n\n"
+        "Masalan:\n"
+        "1\n"
+        "5\n"
+        "12",
+        reply_markup=kb
+    )
+
+    await state.set_state(
+        TaskState.lesson
+    )
 # =========================
 # RECEIVE FILE
 # =========================
