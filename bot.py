@@ -173,6 +173,9 @@ class TaskState(StatesGroup):
 
 class ProfileState(StatesGroup):
     rename = State()
+
+class AdminCommentState(StatesGroup):
+    comment = State()
 # =========================
 # START
 # =========================
@@ -524,43 +527,67 @@ async def receive_task(
     F.data.startswith("grade:")
 )
 async def grade_task(
-    callback: CallbackQuery
+    callback: CallbackQuery,
+    state: FSMContext
 ):
     if callback.from_user.id not in ADMIN_IDS:
         return
 
     _, submission_id, score = callback.data.split(":")
 
-    submission_id = int(submission_id)
-    score = int(score)
+    await state.update_data(
+        submission_id=int(submission_id),
+        score=int(score)
+    )
 
-    data = await get_submission(
+    await callback.message.answer(
+        "💬 O'quvchi uchun izoh yozing.\n\n"
+        "Izohsiz davom etish uchun:\n"
+        "/skip"
+    )
+
+    await state.set_state(
+        AdminCommentState.comment
+    )
+
+    await callback.answer()
+# =========================
+# ADMIN COMMENT
+# =========================
+@dp.message(
+    AdminCommentState.comment
+)
+async def save_comment(
+    message: Message,
+    state: FSMContext
+):
+
+    data = await state.get_data()
+
+    submission_id = data["submission_id"]
+    score = data["score"]
+
+    comment = message.text
+
+    submission = await get_submission(
         submission_id
     )
 
-    if not data:
+    if not submission:
+
+        await message.answer(
+            "❌ Vazifa topilmadi."
+        )
+
+        await state.clear()
+
         return
 
-    user_id = data[1]
-    lesson_number = data[3]
-
-    if score >= 4:
-        status = "accepted"
-
-        await bot.send_message(
-            user_id,
-            f"✅ {lesson_number}-dars vazifasi qabul qilindi.\n\n"
-            f"⭐ Baho: {score}/5"
-        )
-    else:
-        status = "rejected"
-
-        await bot.send_message(
-            user_id,
-            f"❌ {lesson_number}-dars vazifasi qabul qilinmadi.\n\n"
-            f"⭐ Baho: {score}/5\n\n"
-            f"Qayta yuborishingiz mumkin."
-        )
+    status = (
+        "accepted"
+        if score >= 4
+        else "rejected"
+    )
 
     await update_score(
         submission_id,
@@ -568,9 +595,72 @@ async def grade_task(
         status
     )
 
-    await callback.answer(
-        f"{score} baho qo'yildi"
+    text = (
+        f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+        f"⭐ Baho: {score}/5\n\n"
+        f"💬 Lehrer izohi:\n"
+        f"{comment}"
     )
+
+    await bot.send_message(
+        submission["user_id"],
+        text
+    )
+
+    await message.answer(
+        "✅ Baho va izoh yuborildi."
+    )
+
+    await state.clear()
+# =========================
+# SKIP COMMENT
+# =========================
+@dp.message(
+    Command("skip"),
+    AdminCommentState.comment
+)
+async def skip_comment(
+    message: Message,
+    state: FSMContext
+):
+
+    data = await state.get_data()
+
+    submission_id = data["submission_id"]
+    score = data["score"]
+
+    submission = await get_submission(
+        submission_id
+    )
+
+    if not submission:
+
+        await state.clear()
+        return
+
+    status = (
+        "accepted"
+        if score >= 4
+        else "rejected"
+    )
+
+    await update_score(
+        submission_id,
+        score,
+        status
+    )
+
+    await bot.send_message(
+        submission["user_id"],
+        f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+        f"⭐ Baho: {score}/5"
+    )
+
+    await message.answer(
+        "✅ Baho yuborildi."
+    )
+
+    await state.clear()
 # =========================
 # PROFILE
 # =========================

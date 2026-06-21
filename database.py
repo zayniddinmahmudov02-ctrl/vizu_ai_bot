@@ -36,6 +36,7 @@ async def init_db():
             file_type TEXT,
             score INTEGER DEFAULT 0,
             status TEXT DEFAULT 'pending',
+            teacher_comment TEXT                
             created_at TIMESTAMP DEFAULT NOW()
         )
         """)
