@@ -26,6 +26,18 @@ def home():
     return "VIZU AI BOT ishlayapti!"
 from aiogram.exceptions import TelegramBadRequest
 
+def run_web():
+    port = int(
+        os.environ.get(
+            "PORT",
+            10000
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
 # Start a simple Flask keep-alive server in a background thread
 def keep_alive():
     def run():
@@ -798,27 +810,7 @@ async def back_menu(
             "Asosiy menyu",
             reply_markup=main_menu
         )
-# =========================
-# FLASK WEB SERVER
-# =========================
-app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "VIZU AI BOT ishlayapti!"
-
-def run_web():
-    port = int(
-        os.environ.get(
-            "PORT",
-            10000
-        )
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
 # =========================
 # MAIN
 # =========================
