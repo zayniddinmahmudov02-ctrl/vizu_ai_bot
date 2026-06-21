@@ -660,6 +660,10 @@ async def main():
 
     await init_db()
 
+    await bot.delete_webhook(
+        drop_pending_updates=True
+    )
+
     print("Bot ishga tushdi...")
 
     await dp.start_polling(bot)
