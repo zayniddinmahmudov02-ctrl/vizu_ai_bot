@@ -4,7 +4,6 @@ from config import DATABASE_URL, BOT_NAME
 
 pool = None
 
-
 # ==========================
 # INITIALIZATION
 # ==========================
@@ -13,6 +12,7 @@ async def init_db():
     pool = await asyncpg.create_pool(DATABASE_URL)
 
     async with pool.acquire() as conn:
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 user_id BIGINT PRIMARY KEY,
@@ -33,17 +33,31 @@ async def init_db():
                 file_id TEXT,
                 file_type TEXT,
                 score INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'pending',            
+                status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
 
+        # Eski bazalar uchun
         await conn.execute("""
             ALTER TABLE users
             ADD COLUMN IF NOT EXISTS bot_name TEXT
         """)
 
+        await conn.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS accepted_tasks INTEGER DEFAULT 0
+        """)
 
+        await conn.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS rejected_tasks INTEGER DEFAULT 0
+        """)
+
+        await conn.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS total_score INTEGER DEFAULT 0
+        """)
 # ==========================
 # USERS
 # ==========================
