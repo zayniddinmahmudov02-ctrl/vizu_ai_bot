@@ -337,22 +337,29 @@ async def update_name(user_id: int, new_name: str):
             SET full_name=$1
             WHERE user_id=$2
         """, new_name, user_id)
-# ==========================
+# =========================
 # TOP USERS
-# ==========================
+# =========================
 async def get_top_users(limit=20):
     async with pool.acquire() as conn:
 
-        return await conn.fetch("""
+        rows = await conn.fetch("""
             SELECT
+                user_id,
                 full_name,
-                total_score
+                total_score,
+                accepted_tasks
             FROM homework_users
             ORDER BY
                 total_score DESC,
                 accepted_tasks DESC
             LIMIT $1
         """, limit)
+
+        print("TOP USERS:")
+        print(rows)
+
+        return rows
 # ==========================
 # RANKING
 # ==========================
