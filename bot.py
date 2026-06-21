@@ -633,222 +633,88 @@ async def grade_task(
     )
 
     await callback.answer()
-# =========================
-# ADMIN COMMENT
-# =========================
-@dp.message(
-    AdminCommentState.comment
-)
-async def save_comment(
-    message: Message,
-    state: FSMContext
-):
+@dp.message(AdminCommentState.comment)
+async def save_comment(message: Message, state: FSMContext):
     try:
-
         data = await state.get_data()
-
         submission_id = data.get("submission_id")
         score = data.get("score")
         channel_message_id = data.get("channel_message_id")
 
-        submission = await get_submission(
-            submission_id
-        )
+        submission = await get_submission(submission_id)
 
         if not submission:
-
-            await message.answer(
-                "❌ Vazifa topilmadi."
-            )
-
+            await message.answer("❌ Vazifa topilmadi.")
             await state.clear()
             return
 
         comment = message.text or ""
-
-        status = (
-            "accepted"
-            if score >= 4
-            else "rejected"
-        )
-
-        success = await update_score(
-            submission_id,
-            score,
-            status
-        )
+        status = "accepted" if score >= 4 else "rejected"
+        success = await update_score(submission_id, score, status)
 
         if not success:
-
-            await message.answer(
-                "❌ Bu vazifa allaqachon baholangan."
-            )
-
+            await message.answer("❌ Bu vazifa allaqachon baholangan.")
             await state.clear()
             return
 
-        # O'quvchiga yuborish
+# =====================
+        # USERGA XABAR
+        # =====================
         try:
-
+            # user_id ni int ga o'tkazib olish xavfsizroq
+            target_user_id = int(submission['user_id'])
+            
+            print(f"DEBUG: SENDING TO USER ID: {target_user_id}")
+            
             await bot.send_message(
-                submission["user_id"],
-                f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
-                f"⭐ Baho: {score}/5\n\n"
-                f"💬 Lehrer izohi:\n{comment}"
+                chat_id=target_user_id,
+                text=(
+                    f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+                    f"⭐ Baho: {score}/5\n\n"
+                    f"💬 Lehrer izohi:\n{comment}"
+                )
             )
-
+            print("MESSAGE SENT SUCCESS")
         except Exception as e:
-            print(
-                f"USER SEND ERROR: {e}"
-            )
-
-        # Kanaldagi tugmalarni o'chirish
+            # Xatolikni konsolda ko'rish uchun print qiling
+            print(f"CRITICAL ERROR SENDING TO USER: {e}")
+        # =====================
+        # TUGMALARNI O'CHIRISH
+        # =====================
         try:
-
-            await bot.edit_message_reply_markup(
-                chat_id=CHANNEL_ID,
-                message_id=channel_message_id,
-                reply_markup=None
-            )
-
-            # Vazifa ostiga reply qilib yozadi
-            await bot.send_message(
-                chat_id=CHANNEL_ID,
-                reply_to_message_id=channel_message_id,
-                text=
-                f"✅ Vazifa baholandi\n\n"
-                f"⭐ Baho: {score}/5\n\n"
-                f"💬 Izoh:\n{comment}"
-            )
-
+            if channel_message_id:
+                await bot.edit_message_reply_markup(
+                    chat_id=CHANNEL_ID,
+                    message_id=channel_message_id,
+                    reply_markup=None
+                )
         except Exception as e:
-            print(
-                f"CHANNEL ERROR: {e}"
-            )
+            print(f"REMOVE BUTTON ERROR: {e}")
 
-        await message.answer(
-            "✅ Baho va izoh yuborildi."
-        )
+        # =====================
+        # KANALGA NATIJA
+        # =====================
+        try:
+            if channel_message_id:
+                await bot.send_message(
+                    chat_id=CHANNEL_ID,
+                    reply_to_message_id=channel_message_id,
+                    text=(
+                        f"✅ BAHOLANDI\n\n"
+                        f"⭐ Baho: {score}/5\n\n"
+                        f"💬 Izoh:\n{comment}"
+                    )
+                )
+        except Exception as e:
+            print(f"CHANNEL ERROR: {e}")
+
+        await message.answer("✅ Baho va izoh yuborildi.")
 
     except Exception as e:
-
-        print(
-            f"SAVE COMMENT ERROR: {e}"
-        )
-
-        await message.answer(
-            f"❌ Xatolik:\n{e}"
-        )
-
+        print(f"SAVE COMMENT ERROR: {e}")
+        await message.answer(f"❌ Xatolik:\n{e}")
+    
     await state.clear()
-
-
-# =========================
-# SKIP COMMENT
-# =========================
-@dp.message(
-    Command("skip"),
-    AdminCommentState.comment
-)
-async def skip_comment(
-    message: Message,
-    state: FSMContext
-):
-    try:
-
-        data = await state.get_data()
-
-        submission_id = data.get("submission_id")
-        score = data.get("score")
-        channel_message_id = data.get("channel_message_id")
-
-        submission = await get_submission(
-            submission_id
-        )
-
-        if not submission:
-
-            await message.answer(
-                "❌ Vazifa topilmadi."
-            )
-
-            await state.clear()
-            return
-
-        status = (
-            "accepted"
-            if score >= 4
-            else "rejected"
-        )
-
-        success = await update_score(
-            submission_id,
-            score,
-            status
-        )
-
-        if not success:
-
-            await message.answer(
-                "❌ Bu vazifa allaqachon baholangan."
-            )
-
-            await state.clear()
-            return
-
-        # O'quvchiga yuborish
-        try:
-
-            await bot.send_message(
-                submission["user_id"],
-                f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
-                f"⭐ Baho: {score}/5"
-            )
-
-        except Exception as e:
-            print(
-                f"USER SEND ERROR: {e}"
-            )
-
-        # Kanaldagi tugmalarni o'chirish
-        try:
-
-            await bot.edit_message_reply_markup(
-                chat_id=CHANNEL_ID,
-                message_id=channel_message_id,
-                reply_markup=None
-            )
-
-            # Vazifa ostiga reply qilib yozadi
-            await bot.send_message(
-                chat_id=CHANNEL_ID,
-                reply_to_message_id=channel_message_id,
-                text=
-                f"✅ Vazifa baholandi\n\n"
-                f"⭐ Baho: {score}/5"
-            )
-
-        except Exception as e:
-            print(
-                f"CHANNEL ERROR: {e}"
-            )
-
-        await message.answer(
-            "✅ Baho yuborildi."
-        )
-
-    except Exception as e:
-
-        print(
-            f"SKIP COMMENT ERROR: {e}"
-        )
-
-        await message.answer(
-            f"❌ Xatolik:\n{e}"
-        )
-
-    await state.clear()
-
 # =========================
 # PROFILE
 # =========================
