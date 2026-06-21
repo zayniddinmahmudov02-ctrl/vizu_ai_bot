@@ -38,8 +38,6 @@ def run_web():
         host="0.0.0.0",
         port=port
     )
-# Start a simple Flask keep-alive server in a background thread
-def keep_alive():
     def run():
         try:
             app.run(host="0.0.0.0", port=8000)
@@ -49,7 +47,6 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-keep_alive()
 # =========================
 # MENYU
 # =========================
@@ -405,133 +402,198 @@ async def receive_task(
     message: Message,
     state: FSMContext
 ):
-    data = await state.get_data()
+    try:
 
-    lesson_number = data["lesson"]
+        data = await state.get_data()
 
-    passed = await lesson_already_passed(
-        message.from_user.id,
-        lesson_number
-    )
+        lesson_number = data.get("lesson")
 
-    if passed:
+        if not lesson_number:
+
+            await message.answer(
+                "❌ Dars raqami topilmadi."
+            )
+
+            await state.clear()
+            return
+
+        passed = await lesson_already_passed(
+            message.from_user.id,
+            lesson_number
+        )
+
+        if passed:
+
+            await message.answer(
+                f"✅ {lesson_number}-dars avval qabul qilingan.\n\n"
+                "Qayta yuborish mumkin emas.",
+                reply_markup=main_menu
+            )
+
+            await state.clear()
+            return
+
+        user = await get_user(
+            message.from_user.id
+        )
+
+        if user:
+            full_name = user["full_name"]
+        else:
+            full_name = (
+                message.from_user.full_name
+                or "Noma'lum"
+            )
+
+        if message.document:
+            file_id = message.document.file_id
+            file_type = "document"
+
+        elif message.photo:
+            file_id = message.photo[-1].file_id
+            file_type = "photo"
+
+        elif message.video:
+            file_id = message.video.file_id
+            file_type = "video"
+
+        elif message.voice:
+            file_id = message.voice.file_id
+            file_type = "voice"
+
+        elif message.audio:
+            file_id = message.audio.file_id
+            file_type = "audio"
+
+        else:
+
+            await message.answer(
+                "❌ Fayl turi qo'llab-quvvatlanmaydi."
+            )
+
+            return
+
+        submission_id = await add_submission(
+            message.from_user.id,
+            full_name,
+            lesson_number,
+            file_id,
+            file_type
+        )
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="⭐1",
+                        callback_data=f"grade:{submission_id}:1"
+                    ),
+                    InlineKeyboardButton(
+                        text="⭐2",
+                        callback_data=f"grade:{submission_id}:2"
+                    ),
+                    InlineKeyboardButton(
+                        text="⭐3",
+                        callback_data=f"grade:{submission_id}:3"
+                    ),
+                    InlineKeyboardButton(
+                        text="⭐4",
+                        callback_data=f"grade:{submission_id}:4"
+                    ),
+                    InlineKeyboardButton(
+                        text="⭐5",
+                        callback_data=f"grade:{submission_id}:5"
+                    )
+                ]
+            ]
+        )
+
+        caption = (
+            f"📥 Yangi vazifa\n\n"
+            f"👤 {full_name}\n"
+            f"🆔 {message.from_user.id}\n"
+            f"📚 Dars: {lesson_number}\n"
+            f"📄 ID: {submission_id}"
+        )
+
+        try:
+
+            if file_type == "document":
+
+                await bot.send_document(
+                    CHANNEL_ID,
+                    file_id,
+                    caption=caption,
+                    reply_markup=kb
+                )
+
+            elif file_type == "photo":
+
+                await bot.send_photo(
+                    CHANNEL_ID,
+                    file_id,
+                    caption=caption,
+                    reply_markup=kb
+                )
+
+            elif file_type == "video":
+
+                await bot.send_video(
+                    CHANNEL_ID,
+                    file_id,
+                    caption=caption,
+                    reply_markup=kb
+                )
+
+            elif file_type == "voice":
+
+                await bot.send_voice(
+                    CHANNEL_ID,
+                    file_id,
+                    caption=caption,
+                    reply_markup=kb
+                )
+
+            elif file_type == "audio":
+
+                await bot.send_audio(
+                    CHANNEL_ID,
+                    file_id,
+                    caption=caption,
+                    reply_markup=kb
+                )
+
+        except Exception as e:
+
+            print(
+                f"CHANNEL SEND ERROR: {e}"
+            )
+
+            await message.answer(
+                "❌ Kanalga yuborishda xatolik."
+            )
+
+            return
+
         await message.answer(
-            f"✅ {lesson_number}-dars avval qabul qilingan.\n\n"
-            "Qayta yuborish mumkin emas."
+            "✅ Vazifa muvaffaqiyatli yuborildi.\n\n"
+            "📚 Lehrer/in tekshiradi.",
+            reply_markup=main_menu
         )
 
         await state.clear()
-        return
 
-    if message.document:
-        file_id = message.document.file_id
-        file_type = "document"
+    except Exception as e:
 
-    elif message.photo:
-        file_id = message.photo[-1].file_id
-        file_type = "photo"
-
-    elif message.video:
-        file_id = message.video.file_id
-        file_type = "video"
-
-    elif message.voice:
-        file_id = message.voice.file_id
-        file_type = "voice"
-
-    else:
-        file_id = message.audio.file_id
-        file_type = "audio"
-
-    submission_id = await add_submission(
-        message.from_user.id,
-        message.from_user.full_name,
-        lesson_number,
-        file_id,
-        file_type
-    )
-
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⭐1",
-                    callback_data=f"grade:{submission_id}:1"
-                ),
-                InlineKeyboardButton(
-                    text="⭐2",
-                    callback_data=f"grade:{submission_id}:2"
-                ),
-                InlineKeyboardButton(
-                    text="⭐3",
-                    callback_data=f"grade:{submission_id}:3"
-                ),
-                InlineKeyboardButton(
-                    text="⭐4",
-                    callback_data=f"grade:{submission_id}:4"
-                ),
-                InlineKeyboardButton(
-                    text="⭐5",
-                    callback_data=f"grade:{submission_id}:5"
-                )
-            ]
-        ]
-    )
-
-    caption = (
-        f"📥 Yangi vazifa\n\n"
-        f"👤 {message.from_user.full_name}\n"
-        f"🆔 {message.from_user.id}\n"
-        f"📚 Dars: {lesson_number}\n"
-        f"📄 ID: {submission_id}"
-    )
-
-    if file_type == "document":
-        await bot.send_document(
-            CHANNEL_ID,
-            file_id,
-            caption=caption,
-            reply_markup=kb
+        print(
+            f"RECEIVE TASK ERROR: {e}"
         )
 
-    elif file_type == "photo":
-        await bot.send_photo(
-            CHANNEL_ID,
-            file_id,
-            caption=caption,
-            reply_markup=kb
+        await message.answer(
+            f"❌ Xatolik:\n{e}"
         )
 
-    elif file_type == "video":
-        await bot.send_video(
-            CHANNEL_ID,
-            file_id,
-            caption=caption,
-            reply_markup=kb
-        )
-
-    elif file_type == "voice":
-        await bot.send_voice(
-            CHANNEL_ID,
-            file_id,
-            caption=caption,
-            reply_markup=kb
-        )
-
-    else:
-        await bot.send_audio(
-            CHANNEL_ID,
-            file_id,
-            caption=caption,
-            reply_markup=kb
-        )
-
-    await message.answer(
-        "✅ Vazifa yuborildi.\n\nLehrer tekshiradi.",
-        reply_markup=main_menu
-    )
-
-    await state.clear()
+        await state.clear()
 # =========================
 # ADMIN GRADING
 # =========================
@@ -594,77 +656,102 @@ async def save_comment(
     message: Message,
     state: FSMContext
 ):
-
-    data = await state.get_data()
-
-    submission_id = data["submission_id"]
-    score = data["score"]
-    channel_message_id = data["channel_message_id"]
-
-    comment = message.text
-
-    submission = await get_submission(
-        submission_id
-    )
-
-    if not submission:
-
-        await message.answer(
-            "❌ Vazifa topilmadi."
-        )
-
-        await state.clear()
-        return
-
-    status = (
-        "accepted"
-        if score >= 4
-        else "rejected"
-    )
-
-    success = await update_score(
-        submission_id,
-        score,
-        status
-    )
-
-    if not success:
-        await message.answer(
-            "❌ Bu vazifa allaqachon baholangan."
-        )
-        await state.clear()
-        return
-
-    await bot.send_message(
-        submission["user_id"],
-        f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
-        f"⭐ Baho: {score}/5\n\n"
-        f"💬 Lehrer izohi:\n{comment}"
-    )
-
     try:
 
-        await bot.edit_message_reply_markup(
-            chat_id=CHANNEL_ID,
-            message_id=channel_message_id,
-            reply_markup=None
+        data = await state.get_data()
+
+        submission_id = data.get("submission_id")
+        score = data.get("score")
+        channel_message_id = data.get("channel_message_id")
+
+        submission = await get_submission(
+            submission_id
         )
 
-        await bot.edit_message_caption(
-            chat_id=CHANNEL_ID,
-            message_id=channel_message_id,
-            caption=
-            f"✅ BAHOLANGAN\n\n"
-            f"⭐ Baho: {score}/5\n\n"
-            f"💬 Izoh:\n{comment}"
+        if not submission:
+
+            await message.answer(
+                "❌ Vazifa topilmadi."
+            )
+
+            await state.clear()
+            return
+
+        comment = message.text or ""
+
+        status = (
+            "accepted"
+            if score >= 4
+            else "rejected"
+        )
+
+        success = await update_score(
+            submission_id,
+            score,
+            status
+        )
+
+        if not success:
+
+            await message.answer(
+                "❌ Bu vazifa allaqachon baholangan."
+            )
+
+            await state.clear()
+            return
+
+        # O'quvchiga yuborish
+        try:
+
+            await bot.send_message(
+                submission["user_id"],
+                f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+                f"⭐ Baho: {score}/5\n\n"
+                f"💬 Lehrer izohi:\n{comment}"
+            )
+
+        except Exception as e:
+            print(
+                f"USER SEND ERROR: {e}"
+            )
+
+        # Kanaldagi tugmalarni o'chirish
+        try:
+
+            await bot.edit_message_reply_markup(
+                chat_id=CHANNEL_ID,
+                message_id=channel_message_id,
+                reply_markup=None
+            )
+
+            # Vazifa ostiga reply qilib yozadi
+            await bot.send_message(
+                chat_id=CHANNEL_ID,
+                reply_to_message_id=channel_message_id,
+                text=
+                f"✅ Vazifa baholandi\n\n"
+                f"⭐ Baho: {score}/5\n\n"
+                f"💬 Izoh:\n{comment}"
+            )
+
+        except Exception as e:
+            print(
+                f"CHANNEL ERROR: {e}"
+            )
+
+        await message.answer(
+            "✅ Baho va izoh yuborildi."
         )
 
     except Exception as e:
-        print(e)
 
-    await message.answer(
-        "✅ Baho va izoh yuborildi."
-    )
+        print(
+            f"SAVE COMMENT ERROR: {e}"
+        )
+
+        await message.answer(
+            f"❌ Xatolik:\n{e}"
+        )
 
     await state.clear()
 
@@ -680,68 +767,98 @@ async def skip_comment(
     message: Message,
     state: FSMContext
 ):
-
-    data = await state.get_data()
-
-    submission_id = data["submission_id"]
-    score = data["score"]
-    channel_message_id = data["channel_message_id"]
-
-    submission = await get_submission(
-        submission_id
-    )
-
-    if not submission:
-        await state.clear()
-        return
-
-    status = (
-        "accepted"
-        if score >= 4
-        else "rejected"
-    )
-
-    success = await update_score(
-        submission_id,
-        score,
-        status
-    )
-
-    if not success:
-        await message.answer(
-            "❌ Bu vazifa allaqachon baholangan."
-        )
-        await state.clear()
-        return
-
-    await bot.send_message(
-        submission["user_id"],
-        f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
-        f"⭐ Baho: {score}/5"
-    )
-
     try:
 
-        await bot.edit_message_reply_markup(
-            chat_id=CHANNEL_ID,
-            message_id=channel_message_id,
-            reply_markup=None
+        data = await state.get_data()
+
+        submission_id = data.get("submission_id")
+        score = data.get("score")
+        channel_message_id = data.get("channel_message_id")
+
+        submission = await get_submission(
+            submission_id
         )
 
-        await bot.edit_message_caption(
-            chat_id=CHANNEL_ID,
-            message_id=channel_message_id,
-            caption=
-            f"✅ BAHOLANGAN\n\n"
-            f"⭐ Baho: {score}/5"
+        if not submission:
+
+            await message.answer(
+                "❌ Vazifa topilmadi."
+            )
+
+            await state.clear()
+            return
+
+        status = (
+            "accepted"
+            if score >= 4
+            else "rejected"
+        )
+
+        success = await update_score(
+            submission_id,
+            score,
+            status
+        )
+
+        if not success:
+
+            await message.answer(
+                "❌ Bu vazifa allaqachon baholangan."
+            )
+
+            await state.clear()
+            return
+
+        # O'quvchiga yuborish
+        try:
+
+            await bot.send_message(
+                submission["user_id"],
+                f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+                f"⭐ Baho: {score}/5"
+            )
+
+        except Exception as e:
+            print(
+                f"USER SEND ERROR: {e}"
+            )
+
+        # Kanaldagi tugmalarni o'chirish
+        try:
+
+            await bot.edit_message_reply_markup(
+                chat_id=CHANNEL_ID,
+                message_id=channel_message_id,
+                reply_markup=None
+            )
+
+            # Vazifa ostiga reply qilib yozadi
+            await bot.send_message(
+                chat_id=CHANNEL_ID,
+                reply_to_message_id=channel_message_id,
+                text=
+                f"✅ Vazifa baholandi\n\n"
+                f"⭐ Baho: {score}/5"
+            )
+
+        except Exception as e:
+            print(
+                f"CHANNEL ERROR: {e}"
+            )
+
+        await message.answer(
+            "✅ Baho yuborildi."
         )
 
     except Exception as e:
-        print(e)
 
-    await message.answer(
-        "✅ Baho yuborildi."
-    )
+        print(
+            f"SKIP COMMENT ERROR: {e}"
+        )
+
+        await message.answer(
+            f"❌ Xatolik:\n{e}"
+        )
 
     await state.clear()
 # =========================
