@@ -1,7 +1,5 @@
 import asyncpg
 from config import DATABASE_URL, BOT_NAME
-
-
 pool = None
 # ==========================
 # INITIALIZATION
@@ -36,6 +34,9 @@ async def init_db():
                 lesson_number INTEGER,
                 file_id TEXT,
                 file_type TEXT,
+
+                channel_message_id BIGINT,
+
                 score INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT NOW()
@@ -62,9 +63,13 @@ async def init_db():
             ALTER TABLE users
             ADD COLUMN IF NOT EXISTS rejected_tasks INTEGER DEFAULT 0
         """)
-        # ==========================
-        # USERS (legacy / alternate table)
-        # ==========================
+
+        await conn.execute("""
+            ALTER TABLE submissions
+            ADD COLUMN IF NOT EXISTS channel_message_id BIGINT
+        """)
+
+        # HOMEWORK USERS
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS homework_users(
                 user_id BIGINT PRIMARY KEY,
@@ -74,27 +79,106 @@ async def init_db():
                 rejected_tasks INTEGER DEFAULT 0
             )
         """)
+# ==========================
+# SUBMISSIONS TABLE FIX
+# ==========================
+async def init_db():
+    global pool
 
+    pool = await asyncpg.create_pool(
+        DATABASE_URL
+    )
+
+    async with pool.acquire() as conn:
+
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS submissions(
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT,
+                full_name TEXT,
+                lesson_number INTEGER,
+                file_id TEXT,
+                file_type TEXT,
+
+                channel_message_id BIGINT,
+
+                score INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+
+        await conn.execute("""
+            ALTER TABLE submissions
+            ADD COLUMN IF NOT EXISTS channel_message_id BIGINT
+        """)
 # ==========================
 # SUBMISSIONS
 # ==========================
-async def add_submission(user_id, full_name, lesson_number, file_id, file_type):
+async def add_submission(
+    user_id,
+    full_name,
+    lesson_number,
+    file_id,
+    file_type
+):
     async with pool.acquire() as conn:
+
         row = await conn.fetchrow("""
-            INSERT INTO submissions(user_id, full_name, lesson_number, file_id, file_type)
-            VALUES($1, $2, $3, $4, $5)
+            INSERT INTO submissions(
+                user_id,
+                full_name,
+                lesson_number,
+                file_id,
+                file_type
+            )
+            VALUES($1,$2,$3,$4,$5)
             RETURNING id
-        """, user_id, full_name, lesson_number, file_id, file_type)
+        """,
+            user_id,
+            full_name,
+            lesson_number,
+            file_id,
+            file_type
+        )
+
         return row["id"]
 
 
-async def get_submission(submission_id):
+# ==========================
+# SAVE CHANNEL MESSAGE ID
+# ==========================
+async def save_channel_message_id(
+    submission_id,
+    channel_message_id
+):
     async with pool.acquire() as conn:
-        return await conn.fetchrow("""
-            SELECT * FROM submissions
-            WHERE id=$1
-        """, submission_id)
 
+        await conn.execute("""
+            UPDATE submissions
+            SET channel_message_id=$1
+            WHERE id=$2
+        """,
+            channel_message_id,
+            submission_id
+        )
+
+
+# ==========================
+# GET SUBMISSION
+# ==========================
+async def get_submission(
+    submission_id
+):
+    async with pool.acquire() as conn:
+
+        return await conn.fetchrow("""
+            SELECT *
+            FROM submissions
+            WHERE id=$1
+        """,
+            submission_id
+        )
 # ==========================
 # UPDATE SCORE
 # ==========================
@@ -105,21 +189,31 @@ async def update_score(
 ):
     async with pool.acquire() as conn:
 
+        print(f"UPDATE SCORE START: {submission_id}")
+
         submission = await conn.fetchrow("""
             SELECT *
             FROM submissions
             WHERE id=$1
         """, submission_id)
 
+        print(f"SUBMISSION: {submission}")
+
         if not submission:
+            print("SUBMISSION NOT FOUND")
             return False
 
+        print(f"STATUS BEFORE: {submission['status']}")
+
         if submission["status"] != "pending":
+            print("ALREADY CHECKED")
             return False
 
         user_id = submission["user_id"]
 
-        # homework_users da user yo'q bo'lsa yaratib qo'yadi
+        print(f"USER ID: {user_id}")
+        print(f"SCORE: {score}")
+
         await conn.execute("""
             INSERT INTO homework_users(
                 user_id,
@@ -158,6 +252,8 @@ async def update_score(
                 user_id
             )
 
+            print("ACCEPTED TASK UPDATED")
+
         else:
 
             await conn.execute("""
@@ -169,7 +265,28 @@ async def update_score(
                 user_id
             )
 
+            print("REJECTED TASK UPDATED")
+
+        print("UPDATE SCORE SUCCESS")
+
         return True
+# ==========================
+# SAVE CHANNEL MESSAGE ID
+# ==========================
+async def save_channel_message_id(
+    submission_id,
+    channel_message_id
+):
+    async with pool.acquire() as conn:
+
+        await conn.execute("""
+            UPDATE submissions
+            SET channel_message_id=$1
+            WHERE id=$2
+        """,
+            channel_message_id,
+            submission_id
+        )
 # ==========================
 # USERS
 # ==========================

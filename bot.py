@@ -511,64 +511,56 @@ async def receive_task(
             f"📄 ID: {submission_id}"
         )
 
-        try:
+        sent_message = None
 
-            if file_type == "document":
+        if file_type == "document":
 
-                await bot.send_document(
-                    CHANNEL_ID,
-                    file_id,
-                    caption=caption,
-                    reply_markup=kb
-                )
-
-            elif file_type == "photo":
-
-                await bot.send_photo(
-                    CHANNEL_ID,
-                    file_id,
-                    caption=caption,
-                    reply_markup=kb
-                )
-
-            elif file_type == "video":
-
-                await bot.send_video(
-                    CHANNEL_ID,
-                    file_id,
-                    caption=caption,
-                    reply_markup=kb
-                )
-
-            elif file_type == "voice":
-
-                await bot.send_voice(
-                    CHANNEL_ID,
-                    file_id,
-                    caption=caption,
-                    reply_markup=kb
-                )
-
-            elif file_type == "audio":
-
-                await bot.send_audio(
-                    CHANNEL_ID,
-                    file_id,
-                    caption=caption,
-                    reply_markup=kb
-                )
-
-        except Exception as e:
-
-            print(
-                f"CHANNEL SEND ERROR: {e}"
+            sent_message = await bot.send_document(
+                CHANNEL_ID,
+                file_id,
+                caption=caption,
+                reply_markup=kb
             )
 
-            await message.answer(
-                "❌ Kanalga yuborishda xatolik."
+        elif file_type == "photo":
+
+            sent_message = await bot.send_photo(
+                CHANNEL_ID,
+                file_id,
+                caption=caption,
+                reply_markup=kb
             )
 
-            return
+        elif file_type == "video":
+
+            sent_message = await bot.send_video(
+                CHANNEL_ID,
+                file_id,
+                caption=caption,
+                reply_markup=kb
+            )
+
+        elif file_type == "voice":
+
+            sent_message = await bot.send_voice(
+                CHANNEL_ID,
+                file_id,
+                caption=caption,
+                reply_markup=kb
+            )
+
+        elif file_type == "audio":
+
+            sent_message = await bot.send_audio(
+                CHANNEL_ID,
+                file_id,
+                caption=caption,
+                reply_markup=kb
+            )
+
+        print(
+            f"CHANNEL MESSAGE ID: {sent_message.message_id}"
+        )
 
         await message.answer(
             "✅ Vazifa muvaffaqiyatli yuborildi.\n\n"
@@ -856,6 +848,7 @@ async def skip_comment(
         )
 
     await state.clear()
+
 # =========================
 # PROFILE
 # =========================
