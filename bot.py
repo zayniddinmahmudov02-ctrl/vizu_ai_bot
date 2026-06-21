@@ -1,6 +1,6 @@
 import asyncio
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -24,7 +24,19 @@ app = Flask(__name__)
 def home():
     return "VIZU AI BOT ishlayapti!"
 from aiogram.exceptions import TelegramBadRequest
-from keep_alive import keep_alive
+
+# Start a simple Flask keep-alive server in a background thread
+def keep_alive():
+    def run():
+        try:
+            app.run(host="0.0.0.0", port=8000)
+        except Exception:
+            pass
+    t = Thread(target=run)
+    t.daemon = True
+    t.start()
+
+keep_alive()
 # =========================
 # MENYU
 # =========================
@@ -48,27 +60,36 @@ main_menu = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+# =========================
+# ADMIN MENU
+# =========================
+
 admin_menu = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="📊 Admin Panel")
+            KeyboardButton(
+                text="🏆 O'quvchilar reytingi"
+            )
         ],
         [
-            KeyboardButton(text="🏆 O'quvchilar reytingi")
+            KeyboardButton(
+                text="📤 Vazifa yuborish"
+            )
         ],
         [
-            KeyboardButton(text="👤 Mening profilim")
+            KeyboardButton(
+                text="👤 Mening profilim"
+            )
         ]
     ],
     resize_keyboard=True
 )
+
 # =========================
 # ADMIN PANEL
 # =========================
 
-@dp.message(
-    F.text == "📊 Admin Panel"
-)
+@dp.message(Command("admin"))
 async def admin_panel(
     message: Message
 ):
@@ -82,10 +103,15 @@ async def admin_panel(
     text = (
         "📊 Admin Panel\n\n"
         f"👥 Foydalanuvchilar: {users}\n"
-        f"📚 Vazifalar: {tasks}"
+        f"📚 Vazifalar: {tasks}\n\n"
+        "⚙️ Admin rejimi faol"
     )
 
     await message.answer(text)
+
+# =========================
+# CHECK SUBSCRIPTION
+# =========================
 
 async def check_subscription(
     user_id: int
@@ -162,16 +188,13 @@ async def start(
     )
 
     if user:
-
         if message.from_user.id == MAIN_ADMIN_ID:
-
             await message.answer(
-                f"👑 Xush kelibsiz, {user[1]}!",
-                reply_markup=admin_menu
+                f"👑 Xush kelibsiz, {user[1]}!\n\n"
+                "Admin panel uchun /admin yozing.",
+                reply_markup=main_menu
             )
-
         else:
-
             await message.answer(
                 f"Xush kelibsiz, {user[1]}!",
                 reply_markup=main_menu
@@ -556,14 +579,12 @@ async def leaderboard(
 async def back_menu(
     message: Message
 ):
-
     if message.from_user.id == MAIN_ADMIN_ID:
 
         await message.answer(
             "Asosiy menyu",
-            reply_markup=admin_menu
+            reply_markup=main_menu
         )
-
     else:
 
         await message.answer(
