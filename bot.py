@@ -18,13 +18,15 @@ from flask import Flask
 from threading import Thread
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
-
+from aiogram.exceptions import TelegramBadRequest
+# =========================================================
+# FLASK WEB SERVER
+# =========================================================
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "VIZU AI BOT ishlayapti!"
-from aiogram.exceptions import TelegramBadRequest
 
 def run_web():
     port = int(
@@ -36,17 +38,10 @@ def run_web():
 
     app.run(
         host="0.0.0.0",
-        port=port
+        port=port,
+        debug=False,
+        use_reloader=False
     )
-    def run():
-        try:
-            app.run(host="0.0.0.0", port=8000)
-        except Exception:
-            pass
-    t = Thread(target=run)
-    t.daemon = True
-    t.start()
-
 # =========================
 # MENYU
 # =========================
