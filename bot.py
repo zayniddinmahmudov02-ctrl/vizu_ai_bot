@@ -547,12 +547,33 @@ async def grade_task(
 
     _, submission_id, score = callback.data.split(":")
 
+    # Vazifa allaqachon baholanganmi?
+    submission = await get_submission(
+        int(submission_id)
+    )
+
+    if not submission:
+        await callback.answer(
+            "❌ Vazifa topilmadi.",
+            show_alert=True
+        )
+        return
+
+    if submission["status"] != "pending":
+        await callback.answer(
+            "✅ Bu vazifa allaqachon baholangan.",
+            show_alert=True
+        )
+        return
+
     await state.update_data(
         submission_id=int(submission_id),
-        score=int(score)
+        score=int(score),
+        channel_message_id=callback.message.message_id
     )
 
     await callback.message.answer(
+        f"⭐ Tanlangan baho: {score}/5\n\n"
         "💬 O'quvchi uchun izoh yozing.\n\n"
         "Izohsiz davom etish uchun:\n"
         "/skip"
@@ -578,6 +599,7 @@ async def save_comment(
 
     submission_id = data["submission_id"]
     score = data["score"]
+    channel_message_id = data["channel_message_id"]
 
     comment = message.text
 
@@ -592,7 +614,6 @@ async def save_comment(
         )
 
         await state.clear()
-
         return
 
     status = (
@@ -601,29 +622,53 @@ async def save_comment(
         else "rejected"
     )
 
-    await update_score(
+    success = await update_score(
         submission_id,
         score,
         status
     )
 
-    text = (
-        f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
-        f"⭐ Baho: {score}/5\n\n"
-        f"💬 Lehrer izohi:\n"
-        f"{comment}"
-    )
+    if not success:
+        await message.answer(
+            "❌ Bu vazifa allaqachon baholangan."
+        )
+        await state.clear()
+        return
 
     await bot.send_message(
         submission["user_id"],
-        text
+        f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+        f"⭐ Baho: {score}/5\n\n"
+        f"💬 Lehrer izohi:\n{comment}"
     )
+
+    try:
+
+        await bot.edit_message_reply_markup(
+            chat_id=CHANNEL_ID,
+            message_id=channel_message_id,
+            reply_markup=None
+        )
+
+        await bot.edit_message_caption(
+            chat_id=CHANNEL_ID,
+            message_id=channel_message_id,
+            caption=
+            f"✅ BAHOLANGAN\n\n"
+            f"⭐ Baho: {score}/5\n\n"
+            f"💬 Izoh:\n{comment}"
+        )
+
+    except Exception as e:
+        print(e)
 
     await message.answer(
         "✅ Baho va izoh yuborildi."
     )
 
     await state.clear()
+
+
 # =========================
 # SKIP COMMENT
 # =========================
@@ -640,13 +685,13 @@ async def skip_comment(
 
     submission_id = data["submission_id"]
     score = data["score"]
+    channel_message_id = data["channel_message_id"]
 
     submission = await get_submission(
         submission_id
     )
 
     if not submission:
-
         await state.clear()
         return
 
@@ -656,17 +701,43 @@ async def skip_comment(
         else "rejected"
     )
 
-    await update_score(
+    success = await update_score(
         submission_id,
         score,
         status
     )
+
+    if not success:
+        await message.answer(
+            "❌ Bu vazifa allaqachon baholangan."
+        )
+        await state.clear()
+        return
 
     await bot.send_message(
         submission["user_id"],
         f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
         f"⭐ Baho: {score}/5"
     )
+
+    try:
+
+        await bot.edit_message_reply_markup(
+            chat_id=CHANNEL_ID,
+            message_id=channel_message_id,
+            reply_markup=None
+        )
+
+        await bot.edit_message_caption(
+            chat_id=CHANNEL_ID,
+            message_id=channel_message_id,
+            caption=
+            f"✅ BAHOLANGAN\n\n"
+            f"⭐ Baho: {score}/5"
+        )
+
+    except Exception as e:
+        print(e)
 
     await message.answer(
         "✅ Baho yuborildi."
@@ -755,7 +826,6 @@ async def rename_save(
     )
 
     await state.clear()
-
 # =========================
 # RATING
 # =========================
@@ -766,6 +836,12 @@ async def leaderboard(
     message: Message
 ):
     users = await get_top_users()
+
+    if not users:
+        await message.answer(
+            "🏆 Reyting hozircha bo'sh."
+        )
+        return
 
     text = "🏆 O'quvchilar reytingi\n\n"
 

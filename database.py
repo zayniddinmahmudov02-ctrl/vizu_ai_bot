@@ -95,41 +95,81 @@ async def get_submission(submission_id):
             WHERE id=$1
         """, submission_id)
 
-
-async def update_score(submission_id, score, status):
+# ==========================
+# UPDATE SCORE
+# ==========================
+async def update_score(
+    submission_id,
+    score,
+    status
+):
     async with pool.acquire() as conn:
+
         submission = await conn.fetchrow("""
-            SELECT * FROM submissions
+            SELECT *
+            FROM submissions
             WHERE id=$1
         """, submission_id)
 
-        if not submission or submission["status"] != "pending":
+        if not submission:
+            return False
+
+        if submission["status"] != "pending":
             return False
 
         user_id = submission["user_id"]
 
+        # homework_users da user yo'q bo'lsa yaratib qo'yadi
+        await conn.execute("""
+            INSERT INTO homework_users(
+                user_id,
+                full_name
+            )
+            VALUES($1,$2)
+            ON CONFLICT(user_id)
+            DO NOTHING
+        """,
+            submission["user_id"],
+            submission["full_name"]
+        )
+
         await conn.execute("""
             UPDATE submissions
-            SET score=$1, status=$2
+            SET
+                score=$1,
+                status=$2
             WHERE id=$3
-        """, score, status, submission_id)
+        """,
+            score,
+            status,
+            submission_id
+        )
 
         if score >= 4:
+
             await conn.execute("""
                 UPDATE homework_users
-                SET total_score = total_score + $1,
+                SET
+                    total_score = total_score + $1,
                     accepted_tasks = accepted_tasks + 1
                 WHERE user_id=$2
-            """, score, user_id)
+            """,
+                score,
+                user_id
+            )
+
         else:
+
             await conn.execute("""
                 UPDATE homework_users
-                SET rejected_tasks = rejected_tasks + 1
+                SET
+                    rejected_tasks = rejected_tasks + 1
                 WHERE user_id=$1
-            """, user_id)
+            """,
+                user_id
+            )
 
         return True
-
 # ==========================
 # USERS
 # ==========================
