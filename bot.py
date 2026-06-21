@@ -178,8 +178,6 @@ class TaskState(StatesGroup):
 class ProfileState(StatesGroup):
     rename = State()
 
-class AdminCommentState(StatesGroup):
-    comment = State()
 # =========================
 # START
 # =========================
@@ -588,158 +586,149 @@ async def receive_task(
     F.data.startswith("grade:")
 )
 async def grade_task(
-    callback: CallbackQuery,
-    state: FSMContext
+    callback: CallbackQuery
 ):
     if callback.from_user.id not in ADMIN_IDS:
         return
-
-    _, submission_id, score = callback.data.split(":")
-
-    # Vazifa allaqachon baholanganmi?
-    submission = await get_submission(
-        int(submission_id)
-    )
-
-    if not submission:
-        await callback.answer(
-            "❌ Vazifa topilmadi.",
-            show_alert=True
-        )
-        return
-
-    if submission["status"] != "pending":
-        await callback.answer(
-            "✅ Bu vazifa allaqachon baholangan.",
-            show_alert=True
-        )
-        return
-
-    await state.update_data(
-        submission_id=int(submission_id),
-        score=int(score),
-        channel_message_id=callback.message.message_id
-    )
-
-    await callback.message.answer(
-        f"⭐ Tanlangan baho: {score}/5\n\n"
-        "💬 O'quvchi uchun izoh yozing.\n\n"
-        "Izohsiz davom etish uchun:\n"
-        "/skip"
-    )
-
-    await state.set_state(
-        AdminCommentState.comment
-    )
-
-    await callback.answer()
-@dp.message(AdminCommentState.comment)
-async def save_comment(message: Message, state: FSMContext):
     try:
-        data = await state.get_data()
-        submission_id = data.get("submission_id")
-        score = data.get("score")
-        channel_message_id = data.get("channel_message_id")
+        _, submission_id, score = callback.data.split(":")
+        submission_id = int(submission_id)
+        score = int(score)
 
-        submission = await get_submission(submission_id)
+        submission = await get_submission(
+            submission_id
+        )
 
         if not submission:
-            await message.answer("❌ Vazifa topilmadi.")
-            await state.clear()
+            await callback.answer(
+                "❌ Vazifa topilmadi.",
+                show_alert=True
+            )
             return
 
-        comment = message.text or ""
-        status = "accepted" if score >= 4 else "rejected"
-        success = await update_score(submission_id, score, status)
+        if submission["status"] != "pending":
+            await callback.answer(
+                "✅ Bu vazifa allaqachon baholangan.",
+                show_alert=True
+            )
+            return
+
+        status = (
+            "accepted"
+            if score >= 4
+            else "rejected"
+        )
+
+        success = await update_score(
+            submission_id,
+            score,
+            status
+        )
 
         if not success:
-            await message.answer("❌ Bu vazifa allaqachon baholangan.")
-            await state.clear()
+            await callback.answer(
+                "❌ Baholashda xatolik.",
+                show_alert=True
+            )
             return
-    except Exception:
-        pass
-    finally:
-        await state.clear()
+        # =====================
+        # AUTO COMMENT
+        # =====================
+        if score == 1:
+            comment = (
+                "❌ Vazifa qabul qilinmadi.\n\n"
+                "⚠️ Mavzu hali yaxshi o'zlashtirilmagan.\n"
+                "Darsni qayta ko'rib chiqing."
+            )
+        elif score == 2:
+            comment = (
+                "❌ Vazifa qabul qilinmadi.\n\n"
+                "📖 Harakat bor, ammo ko'proq mashq qilish kerak."
+            )
+        elif score == 3:
+            comment = (
+                "❌ Vazifa qabul qilinmadi.\n\n"
+                "👍 Yaxshi natija, lekin hali qabul qilish uchun yetarli emas.\n"
+                "Xatolar ustida ishlang."
+            )
+        elif score == 4:
+            comment = (
+                "✅ Vazifa qabul qilindi.\n\n"
+                "🌟 Juda yaxshi natija.\n"
+                "Davom eting!"
+            )
+        else:
+            comment = (
+                "🏆 Vazifa qabul qilindi.\n\n"
+                "Ajoyib! Vazifa mukammal bajarilgan."
+            )
 
-    # =====================
-    # AUTO COMMENT
-    # =====================
+        # =====================
+        # USERGA XABAR
+        # =====================
+        try:
+            await bot.send_message(
+                chat_id=int(
+                    submission["user_id"]
+                ),
+                text=f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
+                     f"⭐ Baho: {score}/5\n\n"
+                     f"{comment}"
+            )
+        except Exception as e:
+            print(
+                f"USER SEND ERROR: {e}"
+            )
 
-    if score == 1:
-        comment = (
-            "⚠️ Mavzu hali yaxshi o'zlashtirilmagan.\n"
-            "Darsni qayta ko'rib chiqib, yana mashq qiling."
-        )
-
-    elif score == 2:
-        comment = (
-            "📖 Harakat bor, lekin ko'plab xatolar mavjud.\n"
-            "Ko'proq mashq qilish tavsiya etiladi."
-        )
-
-    elif score == 3:
-        comment = (
-            "👍 Asosiy qismi to'g'ri.\n"
-            "Ba'zi xatolar ustida ishlash kerak."
-        )
-
-    elif score == 4:
-        comment = (
-            "🌟 Juda yaxshi natija.\n"
-            "Faqat kichik kamchiliklar mavjud."
-        )
-
-    else:
-        comment = (
-            "🏆 Ajoyib!\n"
-            "Vazifa juda yaxshi bajarilgan.\n"
-            "Davom eting!"
-        )
-
-    # =====================
-    # USERGA XABAR
-    # =====================
-
-    try:
-
-        await bot.send_message(
-            chat_id=int(submission["user_id"]),
-            text=
-            f"📚 {submission['lesson_number']}-dars tekshirildi.\n\n"
-            f"⭐ Baho: {score}/5\n\n"
-            f"{comment}"
-        )
+        # =====================
+        # TUGMALARNI O'CHIRISH
+        # =====================
+        try:
+            await callback.message.edit_reply_markup(
+                reply_markup=None
+            )
+        except Exception as e:
+            print(
+                f"REMOVE BUTTON ERROR: {e}"
+            )
 
     except Exception as e:
-
         print(
-            f"USER SEND ERROR: {e}"
+            f"GRADE TASK ERROR: {e}"
         )
-
+        await callback.answer(
+            f"❌ Xatolik: {e}",
+            show_alert=True
+        )
     # =====================
     # POSTNI TAHRIRLASH
     # =====================
-
     try:
 
-        if channel_message_id:
+        new_text = (
+            f"{comment}\n\n"
+            f"👤 {submission['full_name']}\n"
+            f"🆔 {submission['user_id']}\n"
+            f"📚 Dars: {submission['lesson_number']}\n"
+            f"📄 ID: {submission_id}\n\n"
+            f"⭐ Baho: {score}/5"
+        )
 
-            await bot.edit_message_reply_markup(
-                chat_id=CHANNEL_ID,
-                message_id=channel_message_id,
-                reply_markup=None
+        # captionli media
+        if callback.message.caption:
+
+            await callback.message.edit_caption(
+                caption=new_text
             )
 
-            await bot.edit_message_caption(
+        # voice/audio va boshqa holatlar
+        else:
+
+            await bot.send_message(
                 chat_id=CHANNEL_ID,
-                message_id=channel_message_id,
-                caption=
-                f"✅ BAHOLANDI\n\n"
-                f"👤 {submission['full_name']}\n"
-                f"🆔 {submission['user_id']}\n"
-                f"📚 Dars: {submission['lesson_number']}\n"
-                f"📄 ID: {submission_id}\n\n"
-                f"⭐ Baho: {score}/5"
+                reply_to_message_id=
+                callback.message.message_id,
+                text=new_text
             )
 
     except Exception as e:
@@ -748,9 +737,10 @@ async def save_comment(message: Message, state: FSMContext):
             f"EDIT POST ERROR: {e}"
         )
 
-    await message.answer(
-        "✅ Baho yuborildi."
+    await callback.answer(
+        f"⭐ {score}/5 qo'yildi"
     )
+
 # =========================
 # PROFILE
 # =========================
