@@ -340,7 +340,7 @@ async def update_name(user_id: int, new_name: str):
 # =========================
 # TOP USERS
 # =========================
-async def get_top_users(limit=20):
+async def get_top_users(limit=100):
     async with pool.acquire() as conn:
 
         rows = await conn.fetch("""

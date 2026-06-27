@@ -913,20 +913,21 @@ async def leaderboard(
         )
         return
 
-    text = "🏆 O'quvchilar reytingi\n\n"
-
-    medal = [
-        "🥇",
-        "🥈",
-        "🥉"
-    ]
+    text = "🏆 O'quvchilar reytingi (TOP-100)\n\n"
 
     for i, user in enumerate(users):
 
-        if i < 3:
-            prefix = medal[i]
+        if i == 0:
+            prefix = "🥇"
+
+        elif i == 1:
+            prefix = "🥈"
+
+        elif i == 2:
+            prefix = "🥉"
+
         else:
-            prefix = f"{i+1}."
+            prefix = f"#{i+1}"
 
         text += (
             f"{prefix} "
