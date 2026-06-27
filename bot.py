@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import asyncio
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
@@ -16,9 +20,10 @@ from config import *
 from database import *
 from flask import Flask
 from threading import Thread
+from aiogram.exceptions import TelegramBadRequest
+
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
-from aiogram.exceptions import TelegramBadRequest
 # =========================================================
 # FLASK WEB SERVER
 # =========================================================
