@@ -178,6 +178,7 @@ class RegisterState(StatesGroup):
 
 class TaskState(StatesGroup):
     lesson = State()
+    task = State()
     file = State()
 
 class ProfileState(StatesGroup):
@@ -273,7 +274,10 @@ async def save_name(message: Message, state: FSMContext):
 # TASK MENU
 # =========================
 @dp.message(F.text == "📤 Vazifa yuborish")
-async def task_menu(message: Message, state: FSMContext):
+async def task_menu(
+    message: Message,
+    state: FSMContext
+):
 
     kb = ReplyKeyboardMarkup(
         keyboard=[
@@ -295,7 +299,10 @@ async def task_menu(message: Message, state: FSMContext):
         reply_markup=kb
     )
 
-    await state.set_state(TaskState.lesson)
+    await state.set_state(
+        TaskState.lesson
+    )
+
 # =========================
 # LESSON NUMBER
 # =========================
@@ -319,7 +326,8 @@ async def get_lesson(
     if not message.text.isdigit():
 
         await message.answer(
-            "❌ Faqat dars raqamini yuboring.\n\nMasalan: 1, 5, 12"
+            "❌ Faqat dars raqamini yuboring.\n\n"
+            "Masalan: 1, 5, 12"
         )
 
         return
@@ -342,8 +350,72 @@ async def get_lesson(
     )
 
     await message.answer(
-        f"📤 {lesson}-dars uchun vazifangizni yuboring.\n\n"
-        "📎 Rasm, audio, video yoki fayl yuborishingiz mumkin.",
+        f"📚 {lesson}-dars tanlandi.\n\n"
+        "📝 Endi topshiriq raqamini kiriting.\n\n"
+        "Masalan:\n"
+        "1\n"
+        "2\n"
+        "3",
+        reply_markup=kb
+    )
+
+    await state.set_state(
+        TaskState.task
+    )
+# =========================
+# TASK NUMBER
+# =========================
+@dp.message(TaskState.task)
+async def get_task_number(
+    message: Message,
+    state: FSMContext
+):
+
+    if message.text == "⬅️ Orqaga":
+
+        await state.set_state(
+            TaskState.lesson
+        )
+
+        await message.answer(
+            "📚 Dars raqamini kiriting."
+        )
+
+        return
+
+    if not message.text.isdigit():
+
+        await message.answer(
+            "❌ Faqat topshiriq raqamini kiriting."
+        )
+
+        return
+
+    task = int(message.text)
+
+    await state.update_data(
+        task=task
+    )
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text="⬅️ Orqaga"
+                )
+            ]
+        ],
+        resize_keyboard=True
+    )
+
+    await message.answer(
+        f"📝 {task}-topshiriq tanlandi.\n\n"
+        "📎 Endi vazifangizni yuboring.\n\n"
+        "✅ Audio\n"
+        "✅ Rasm\n"
+        "✅ Video\n"
+        "✅ Matn\n"
+        "✅ Fayl",
         reply_markup=kb
     )
 
@@ -374,16 +446,12 @@ async def back_from_file(
     )
 
     await message.answer(
-        "📚 Qaysi dars vazifasini yubormoqchisiz?\n\n"
-        "Masalan:\n"
-        "1\n"
-        "5\n"
-        "12",
+        "📝 Topshiriq raqamini kiriting.",
         reply_markup=kb
     )
 
     await state.set_state(
-        TaskState.lesson
+        TaskState.task
     )
 # =========================
 # RECEIVE FILE
