@@ -453,6 +453,7 @@ async def back_from_file(
     await state.set_state(
         TaskState.task
     )
+
 # =========================
 # RECEIVE FILE
 # =========================
@@ -473,6 +474,7 @@ async def receive_task(
         data = await state.get_data()
 
         lesson_number = data.get("lesson")
+        task_number = data.get("task")
 
         if not lesson_number:
 
@@ -483,12 +485,13 @@ async def receive_task(
             await state.clear()
             return
 
+        # 2-dars uchun qayta topshirishga ruxsat
         passed = await lesson_already_passed(
             message.from_user.id,
             lesson_number
         )
 
-        if passed:
+        if lesson_number != 2 and passed:
 
             await message.answer(
                 f"✅ {lesson_number}-dars avval qabul qilingan.\n\n"
@@ -576,10 +579,11 @@ async def receive_task(
 
         caption = (
             f"📥 Yangi vazifa\n\n"
-            f"👤 {full_name}\n"
-            f"🆔 {message.from_user.id}\n"
+            f"👤 O'quvchi: {full_name}\n"
+            f"🆔 Telegram ID: {message.from_user.id}\n"
             f"📚 Dars: {lesson_number}\n"
-            f"📄 ID: {submission_id}"
+            f"📝 Topshiriq: {task_number}\n"
+            f"📄 Submission ID: {submission_id}"
         )
 
         sent_message = None
@@ -630,7 +634,8 @@ async def receive_task(
             )
 
         print(
-            f"CHANNEL MESSAGE ID: {sent_message.message_id}"
+            f"CHANNEL MESSAGE ID: "
+            f"{sent_message.message_id}"
         )
 
         await message.answer(
