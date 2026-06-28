@@ -453,7 +453,6 @@ async def back_from_file(
     await state.set_state(
         TaskState.task
     )
-
 # =========================
 # RECEIVE FILE
 # =========================
@@ -539,13 +538,14 @@ async def receive_task(
             await message.answer(
                 "❌ Fayl turi qo'llab-quvvatlanmaydi."
             )
-
             return
 
+        # MUHIM O'ZGARISH
         submission_id = await add_submission(
             message.from_user.id,
             full_name,
             lesson_number,
+            task_number,
             file_id,
             file_type
         )
@@ -636,6 +636,11 @@ async def receive_task(
         print(
             f"CHANNEL MESSAGE ID: "
             f"{sent_message.message_id}"
+        )
+
+        await save_channel_message_id(
+            submission_id,
+            sent_message.message_id
         )
 
         await message.answer(

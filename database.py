@@ -113,12 +113,13 @@ async def init_db():
             ADD COLUMN IF NOT EXISTS channel_message_id BIGINT
         """)
 # ==========================
-# SUBMISSIONS
+# ADD SUBMISSION
 # ==========================
 async def add_submission(
     user_id,
     full_name,
     lesson_number,
+    task_number,
     file_id,
     file_type
 ):
@@ -129,15 +130,17 @@ async def add_submission(
                 user_id,
                 full_name,
                 lesson_number,
+                task_number,
                 file_id,
                 file_type
             )
-            VALUES($1,$2,$3,$4,$5)
+            VALUES($1,$2,$3,$4,$5,$6)
             RETURNING id
         """,
             user_id,
             full_name,
             lesson_number,
+            task_number,
             file_id,
             file_type
         )
@@ -162,7 +165,6 @@ async def save_channel_message_id(
             channel_message_id,
             submission_id
         )
-
 
 # ==========================
 # GET SUBMISSION
