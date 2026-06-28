@@ -352,6 +352,7 @@ async def get_top_users(limit=100):
                 total_score,
                 accepted_tasks
             FROM homework_users
+            WHERE total_score > 0
             ORDER BY
                 total_score DESC,
                 accepted_tasks DESC
@@ -362,6 +363,7 @@ async def get_top_users(limit=100):
         print(rows)
 
         return rows
+    
 # ==========================
 # RANKING
 # ==========================
